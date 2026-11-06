@@ -1,0 +1,1316 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Causal Delay — Launching Demo (Vertical)</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Georgia", serif;
+        background: #f4f1ec;
+        color: #333;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 28px 16px 70px;
+      }
+
+      /* ── Layout: single column, one row per condition, stacked
+             vertically ── */
+      .top-wrap {
+        width: 100%;
+        max-width: 998px;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        align-items: stretch;
+      }
+      .row {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* ── Delay control bar ── */
+      .delayBar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        width: 100%;
+        background: #f4f1ec;
+        padding: 14px 18px;
+        border: 1px solid #ddd6c8;
+        border-radius: 8px;
+        margin-bottom: 18px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .ctrl-label {
+        font-size: 12px;
+        color: #777;
+        letter-spacing: 0.03em;
+        text-align: center;
+      }
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 220px;
+        height: 4px;
+        background: #ddd6c8;
+        border-radius: 2px;
+        outline: none;
+        cursor: pointer;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #b8935a;
+        cursor: pointer;
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #b8935a;
+        border: none;
+        cursor: pointer;
+      }
+      .delay-readout {
+        font-size: 16px;
+        font-weight: bold;
+        color: #b8935a;
+        min-width: 68px;
+        text-align: center;
+      }
+      .delay-note {
+        font-size: 10.5px;
+        color: #aaa;
+        text-align: center;
+        margin-top: 8px;
+        line-height: 1.5;
+      }
+      .delay-note em {
+        color: #b8935a;
+        font-style: normal;
+      }
+
+      /* ── Panel — sized to match each trial's canvas in
+             spc_pilot1_script_V3_shifted.html (max-width 998px =
+             960px canvas + 2×18px padding + 2×1px border, fixed
+             320px height) ── */
+      .panel {
+        width: 100%;
+        max-width: 998px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #e8e1d4;
+        border-radius: 10px;
+        padding: 18px;
+      }
+      .panel-label {
+        font-size: 12px;
+        color: #888;
+        text-align: center;
+        margin-bottom: 10px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        line-height: 1.6;
+      }
+      .cond-num {
+        display: inline-block;
+        font-size: 11px;
+        color: #b8935a;
+        margin-bottom: 2px;
+        font-weight: bold;
+      }
+      .sub {
+        color: #bbb;
+        font-size: 10px;
+        text-transform: none;
+        display: block;
+        margin-top: 2px;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 320px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        background: #fafafa;
+      }
+
+      /* ── Fullscreen expand button ── */
+      .expand-btn {
+        position: absolute;
+        bottom: 14px;
+        right: 14px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #ddd6c8;
+        color: #b8935a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        cursor: pointer;
+        z-index: 5;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          transform 0.1s;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+      }
+      .expand-btn:hover {
+        background: #fbf6ec;
+        border-color: #b8935a;
+        transform: scale(1.06);
+      }
+
+      /* ── Fullscreen overlay ── */
+      #fullscreenOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: #fafafa;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+      }
+      #fullscreenOverlay.active {
+        display: flex;
+      }
+      #fsCanvas {
+        width: min(90vw, 1100px);
+        height: min(70vh, 620px);
+        border: 2px solid #000;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+      #fsClose {
+        position: absolute;
+        top: 24px;
+        right: 28px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #ddd6c8;
+        color: #b8935a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+      }
+      #fsClose:hover {
+        background: #fbf6ec;
+        border-color: #b8935a;
+      }
+      #fsStatus {
+        display: none;
+      }
+
+      /* ── Loop controls per panel ── */
+      .panel-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .loop-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #888;
+        cursor: pointer;
+        user-select: none;
+      }
+      .loop-toggle input {
+        width: 15px;
+        height: 15px;
+        accent-color: #b8935a;
+        cursor: pointer;
+      }
+      .status {
+        display: none;
+      }
+      .replay-btn {
+        background: transparent;
+        border: 1px solid #ddd6c8;
+        color: #999;
+        font-family: "Georgia", serif;
+        font-size: 11px;
+        padding: 5px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        letter-spacing: 0.03em;
+        transition:
+          border-color 0.15s,
+          color 0.15s;
+      }
+      .replay-btn:hover {
+        border-color: #b8935a;
+        color: #b8935a;
+      }
+
+      /* ── Scrambled-face version picker (Object Condition only) ── */
+      .version-select {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .version-label {
+        font-size: 11px;
+        color: #999;
+        letter-spacing: 0.03em;
+      }
+      .version-btn {
+        background: transparent;
+        border: 1px solid #ddd6c8;
+        color: #999;
+        font-family: "Georgia", serif;
+        font-size: 11px;
+        width: 26px;
+        height: 26px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          color 0.15s,
+          background 0.15s;
+      }
+      .version-btn:hover {
+        border-color: #b8935a;
+        color: #b8935a;
+      }
+      .version-btn.selected {
+        border-color: #b8935a;
+        background: #fbf6ec;
+        color: #8f6d3c;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top-wrap">
+      <!-- ══════════════ ROW 1 (display order) — Object Condition (scrambled face) ══════════════ -->
+      <div class="row">
+        <div class="delayBar">
+          <div class="controls">
+            <span class="ctrl-label"
+              >Delay between contact<br />and YELLOW's launch:</span
+            >
+            <input
+              type="range"
+              id="delaySlider2"
+              min="0"
+              max="16"
+              step="1"
+              value="8"
+            />
+            <span class="delay-readout" id="delayVal2">0 ms</span>
+          </div>
+          <div class="delay-note">
+            <em></em>
+            <em></em>-1000, -750, -500, -250, -100, -50, -33, -17, 0, 17, 33,
+            50, 100, 250, 500, 750, 1000
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-label">
+            <span class="cond-num">Object Condition</span>
+          </div>
+          <canvas id="c2" width="960" height="320"></canvas>
+          <div class="expand-btn" id="expand2" title="Fullscreen">→</div>
+          <div class="panel-controls">
+            <label class="loop-toggle"
+              ><input type="checkbox" id="loop2" checked /> Loop</label
+            >
+            <button class="replay-btn" id="replay2">Replay</button>
+            <div class="version-select">
+              <span class="version-label">Face version:</span>
+              <button
+                class="version-btn selected"
+                id="versionBtnA"
+                data-version="A"
+              >
+                A
+              </button>
+              <button class="version-btn" id="versionBtnB" data-version="B">
+                B
+              </button>
+              <button class="version-btn" id="versionBtnC" data-version="C">
+                C
+              </button>
+              <button class="version-btn" id="versionBtnD" data-version="D">
+                D
+              </button>
+            </div>
+          </div>
+          <div class="status" id="st2"></div>
+        </div>
+      </div>
+
+      <!-- ══════════════ ROW 2 (display order) — Agent Condition (upright face) ══════════════ -->
+      <div class="row">
+        <div class="delayBar">
+          <div class="controls">
+            <span class="ctrl-label"
+              >Delay between contact<br />and YELLOW's launch:</span
+            >
+            <input
+              type="range"
+              id="delaySlider1"
+              min="0"
+              max="16"
+              step="1"
+              value="8"
+            />
+            <span class="delay-readout" id="delayVal1">0 ms</span>
+          </div>
+          <div class="delay-note">
+            <em></em> <em></em> -1000, -750, -500, -250, -100, -50, -33, -17, 0,
+            17, 33, 50, 100, 250, 500, 750, 1000
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-label">
+            <span class="cond-num">Agent Condition</span>
+          </div>
+          <canvas id="c1" width="960" height="320"></canvas>
+          <div class="expand-btn" id="expand1" title="Fullscreen">→</div>
+          <div class="panel-controls">
+            <label class="loop-toggle"
+              ><input type="checkbox" id="loop1" checked /> Loop</label
+            >
+            <button class="replay-btn" id="replay1">Replay</button>
+          </div>
+          <div class="status" id="st1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+     FULLSCREEN OVERLAY
+══════════════════════════════════════════════ -->
+    <div id="fullscreenOverlay">
+      <div id="fsClose" title="Close">✕</div>
+      <canvas id="fsCanvas"></canvas>
+      <div id="fsStatus"></div>
+    </div>
+
+    <script>
+      "use strict";
+
+      /* ══════════════════════════════════════════════════════
+         PARADIGM NOTE (exploratory demo)
+         This version swaps the causal signal from a MECHANICAL change
+         (the patient's face/color changing in place) to a LAUNCHING
+         event (classic Michotte-style): YELLOW sits still while BLUE
+         approaches; once BLUE makes contact, it stops, and — after
+         the chosen delay — YELLOW itself takes off and travels to the
+         right. Both conditions' faces keep whatever "before" look
+         they had the whole time; nothing about the face changes
+         anymore, only whether YELLOW is moving.
+══════════════════════════════════════════════════════ */
+
+      /* ══════════════════════════════════════════════════════
+   DEVICE PIXEL RATIO — fixes the blurry-ball issue.
+   Each canvas's backing store (canvas.width/height, the actual pixel
+   buffer it draws into) is now sized at DPR× its on-screen CSS size,
+   while the CSS size itself stays the same — so on a 2x/3x "retina"
+   display, the canvas has 2x/3x as many real pixels to draw with
+   instead of being a small buffer stretched up to fill a larger box
+   (which is what caused the blur). ctx.setTransform(DPR, ...) in each
+   runner's resize() then scales all drawing so every existing
+   coordinate (ball radius, positions, etc.) still means the same
+   thing in CSS pixels — nothing else about the layout changes.
+══════════════════════════════════════════════════════ */
+      const DPR = window.devicePixelRatio || 1;
+
+      /* ══════════════════════════════════════════════════════
+   FIXED STIMULUS PARAMETERS
+══════════════════════════════════════════════════════ */
+      const FPS = 60;
+      const MM_TO_PX = 2;
+      const BALL_DIAMETER_MM = 26;
+      const BALL_RADIUS_MM = BALL_DIAMETER_MM / 2;
+      const BALL_SPEED_MM_PER_S = 90; // BLUE's approach speed
+
+      /* How fast YELLOW travels once launched. Same value as BLUE's
+         approach speed by default — change this if you want the
+         launched object to look faster/slower than the causer. */
+      const PATIENT_LAUNCH_SPEED_MM_PER_S = 90;
+
+      const BALL_RADIUS_PX = BALL_RADIUS_MM * MM_TO_PX; // 26 px
+
+      const AGENT_COLOR = "#7a9ec9"; // blue — causal agent
+      const PATIENT_COLOR = "#e8b860"; // yellow — stays this color the whole trial
+
+      function getAgentSize() {
+        return BALL_RADIUS_PX;
+      }
+      function getPatientSize() {
+        return BALL_RADIUS_PX;
+      }
+      /* Real mm/s → px this frame, using the live measured ms-per-frame
+         (defined just below) rather than assuming 1000/60, so both
+         balls' real-world speeds stay constant across displays. */
+      function getAgentSpeed() {
+        return BALL_SPEED_MM_PER_S * MM_TO_PX * (measuredFrameMs / 1000);
+      }
+      function getPatientLaunchSpeed() {
+        return (
+          PATIENT_LAUNCH_SPEED_MM_PER_S * MM_TO_PX * (measuredFrameMs / 1000)
+        );
+      }
+      function getAgentShape() {
+        return "circle";
+      }
+      function getPatientShape() {
+        return "circle";
+      }
+
+      /* ══════════════════════════════════════════════════════
+         RUNTIME FRAME-RATE CALIBRATION — unchanged from before; see
+         the other demo files for the full explanation. In short: this
+         keeps a live estimate of real ms-per-frame so delay timing and
+         speeds stay correct regardless of the viewer's refresh rate.
+      ══════════════════════════════════════════════════════ */
+      let measuredFrameMs = 1000 / FPS;
+      let lastCalibTs = null;
+      const FRAME_EMA_ALPHA = 0.05;
+
+      function calibrationTick(ts) {
+        if (lastCalibTs !== null) {
+          const dt = ts - lastCalibTs;
+          if (dt > 0 && dt < 250) {
+            measuredFrameMs =
+              measuredFrameMs * (1 - FRAME_EMA_ALPHA) + dt * FRAME_EMA_ALPHA;
+          }
+        }
+        lastCalibTs = ts;
+        requestAnimationFrame(calibrationTick);
+      }
+      requestAnimationFrame(calibrationTick);
+
+      function msToFrames(ms) {
+        return Math.round(ms / measuredFrameMs);
+      }
+
+      const RESTART_PAUSE_MS = 500; // pause after YELLOW exits, before the loop replays
+
+      /* ══════════════════════════════════════════════════════
+   DELAY SLIDERS — now "delay between contact and launch"
+══════════════════════════════════════════════════════ */
+      const DELAY_VALUES = [
+        -1000, -750, -500, -250, -100, -50, -33, -17, 0, 17, 33, 50, 100, 250,
+        500, 750, 1000,
+      ];
+      function fmtDelay(v) {
+        return v === 0 ? "0 ms" : (v > 0 ? "+" : "") + v + " ms";
+      }
+
+      function wireDelaySlider(sliderEl, readoutEl) {
+        readoutEl.textContent = fmtDelay(DELAY_VALUES[+sliderEl.value]);
+        sliderEl.oninput = () => {
+          readoutEl.textContent = fmtDelay(DELAY_VALUES[+sliderEl.value]);
+        };
+        return () => DELAY_VALUES[+sliderEl.value];
+      }
+
+      const delaySlider1 = document.getElementById("delaySlider1");
+      const getDelay1 = wireDelaySlider(
+        delaySlider1,
+        document.getElementById("delayVal1"),
+      );
+      const delaySlider2 = document.getElementById("delaySlider2");
+      const getDelay2 = wireDelaySlider(
+        delaySlider2,
+        document.getElementById("delayVal2"),
+      );
+
+      /* ══════════════════════════════════════════════════════
+   DRAWING PRIMITIVES
+══════════════════════════════════════════════════════ */
+      function drawBall(ctx, x, y, r, col, shape = "circle") {
+        ctx.fillStyle = col;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.5;
+        if (shape === "square") {
+          ctx.beginPath();
+          ctx.rect(x - r, y - r, r * 2, r * 2);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      /* ── Row 2 (Agent Condition) face ──
+         Upright face, looking left (toward the agent ball). Always
+         drawn in its neutral ("before") look now — the causal signal
+         is YELLOW launching into motion, not a face change. */
+      function drawFaceLines(ctx, bx, by, r) {
+        const eyeR = r * 0.22;
+        const eyeY = by - r * 0.22;
+        const eyeOffsetX = r * 0.34;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(bx, by, r - 0.5, 0, Math.PI * 2);
+        ctx.clip();
+
+        // Flat eyebrows (neutral)
+        const browY = eyeY - eyeR * 1.55;
+        const browWidth = r * 0.085;
+        const leftEyeX = bx - eyeOffsetX;
+        const rightEyeX = bx + eyeOffsetX;
+        ctx.strokeStyle = "#2a1e0a";
+        ctx.lineWidth = browWidth;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(leftEyeX - eyeR, browY);
+        ctx.lineTo(leftEyeX + eyeR, browY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(rightEyeX - eyeR, browY);
+        ctx.lineTo(rightEyeX + eyeR, browY);
+        ctx.stroke();
+
+        // Eyes: white, outline, pupil shifted left, small highlight
+        const pupilR = eyeR * 0.46;
+        const pupilShift = -eyeR * 0.34; // looking left, toward the agent
+        for (const eyeX of [leftEyeX, rightEyeX]) {
+          ctx.beginPath();
+          ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2);
+          ctx.fillStyle = "#fff";
+          ctx.fill();
+          ctx.strokeStyle = "#444";
+          ctx.lineWidth = 1.0;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(eyeX + pupilShift - 0.8, eyeY, pupilR, 0, Math.PI * 2);
+          ctx.fillStyle = "#1a0e00";
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(
+            eyeX + pupilShift - pupilR * 0.28,
+            eyeY - pupilR * 0.28,
+            pupilR * 0.22,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          ctx.fill();
+        }
+
+        // Nose (small "v")
+        const noseTopY = eyeY + r * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(bx - r * 0.08, noseTopY);
+        ctx.lineTo(bx, noseTopY + r * 0.14);
+        ctx.lineTo(bx + r * 0.08, noseTopY);
+        ctx.strokeStyle = "#2a1e0a";
+        ctx.lineWidth = 1.4;
+        ctx.lineCap = "round";
+        ctx.stroke();
+
+        // Flat mouth line (neutral)
+        ctx.beginPath();
+        ctx.moveTo(bx - r * 0.28, by + r * 0.5);
+        ctx.lineTo(bx + r * 0.28, by + r * 0.5);
+        ctx.strokeStyle = "#444";
+        ctx.lineWidth = 1.6;
+        ctx.lineCap = "round";
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      /* ── Row 1 (Object Condition) scrambled face ──
+         Four layouts the "Face version" buttons switch between: A, B
+         and C are fixed hand-placed layouts; D places all nine parts
+         at a new random spot every trial. Each layout lists where its
+         parts sit as x/y offsets (px, on the 26-px reference ball)
+         from the ball's center, BEFORE the 90° rotation applied in
+         the Object Condition's drawScene. The face always stays in
+         its "before" look now (flat brows, flat mouth) — only
+         whether YELLOW is launched changes. */
+      const SCRAMBLED_VERSIONS = {
+        A: {
+          before: {
+            browLeft: { x: 13, y: 0 },
+            browRight: { x: -13, y: 0 },
+            mouth: { x: 0, y: 0 },
+            pupilUpper: { x: -22, y: 0 },
+            pupilLower: { x: 22, y: 0 },
+            scleraUpper: { x: 0, y: -18 },
+            scleraLower: { x: 0, y: 18 },
+            noseLeftLeg: { x: -9, y: 17 },
+            noseRightLeg: { x: 9, y: -17 },
+          },
+        },
+        B: {
+          before: {
+            browLeft: { x: 14, y: -10 },
+            browRight: { x: -13, y: 11 },
+            mouth: { x: 0, y: 0 },
+            pupilUpper: { x: 15, y: -12, deg: 180 },
+            pupilLower: { x: -13, y: 12, deg: 180 },
+            scleraUpper: { x: 12, y: 12 },
+            scleraLower: { x: -10, y: -12.5 },
+            noseLeftLeg: { x: 21, y: 10 },
+            noseRightLeg: { x: -19, y: -10 },
+          },
+        },
+        C: {
+          before: {
+            browLeft: { x: 10, y: 12 },
+            browRight: { x: -10, y: -12 },
+            mouth: { x: 0, y: 0 },
+            pupilUpper: { x: 18, y: 12 },
+            pupilLower: { x: -17, y: -12 },
+            scleraUpper: { x: 12, y: -12, deg: 270 },
+            scleraLower: { x: -10, y: 12, deg: 270 },
+            noseLeftLeg: { x: 21, y: -10 },
+            noseRightLeg: { x: -19, y: 10 },
+          },
+        },
+      };
+
+      // Which scrambled layout the Object Condition panel shows right
+      // now. Changed with the A/B/C/D buttons under the canvas.
+      let scrambledVersion = "A";
+
+      // Draws one face part: moves to its x/y point (measured from the
+      // ball's center x, y), turns by its "deg", then calls
+      // drawFunction, which draws the part around (0, 0).
+      function drawPart(ctx, x, y, part, drawFunction) {
+        ctx.save();
+        ctx.translate(x + part.x, y + part.y);
+        ctx.rotate(((part.deg || 0) * Math.PI) / 180);
+        drawFunction();
+        ctx.restore();
+      }
+
+      // Scrambled face parts that never move: two "eyes" (white
+      // circle with a yellow dot), two dark pupils and two short nose
+      // lines. p = the "before" positions of the chosen layout.
+      function drawScrambledFace(ctx, x, y, r, p) {
+        const eyeR = r * 0.22;
+        const pupilR = eyeR * 0.48;
+        const innerShift = eyeR - pupilR; // yellow dot inside the white eye
+        const dotShift = r * 0.55 + 3 - r * 0.48; // yellow dot beside it
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r - 0.5, 0, Math.PI * 2);
+        ctx.clip();
+
+        function fillCircle(cx, cy, rad, color) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+        function strokeCircle(cx, cy, rad, color, lw) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lw;
+          ctx.stroke();
+        }
+        function strokeLine(x1, y1, x2, y2, color, lw) {
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lw;
+          ctx.lineCap = "round";
+          ctx.stroke();
+        }
+
+        // Lower eye (its yellow dots sit toward +x)
+        drawPart(ctx, x, y, p.scleraLower, () => {
+          fillCircle(0, 0, eyeR, "#fff");
+          fillCircle(innerShift, 0, pupilR, PATIENT_COLOR);
+          strokeCircle(0, 0, eyeR, "#444", 1.0);
+          strokeCircle(innerShift, 0, pupilR, "#444", 1.0);
+          fillCircle(dotShift, 0, pupilR, PATIENT_COLOR);
+          fillCircle(
+            dotShift - pupilR * 0.28 - 3,
+            -pupilR * 0.28,
+            pupilR * 0.22,
+            PATIENT_COLOR,
+          );
+        });
+
+        // Upper eye (its yellow dots sit toward -x)
+        drawPart(ctx, x, y, p.scleraUpper, () => {
+          fillCircle(0, 0, eyeR, "#fff");
+          fillCircle(-innerShift, 0, pupilR, PATIENT_COLOR);
+          strokeCircle(0, 0, eyeR, "#444", 1.0);
+          strokeCircle(-innerShift, 0, pupilR, "#444", 1.0);
+          fillCircle(-dotShift, 0, pupilR, PATIENT_COLOR);
+          fillCircle(
+            -dotShift - pupilR * 0.28 + 3,
+            -pupilR * 0.28,
+            pupilR * 0.22,
+            PATIENT_COLOR,
+          );
+        });
+
+        // Two dark pupils with highlights
+        for (const pupil of [p.pupilLower, p.pupilUpper]) {
+          drawPart(ctx, x, y, pupil, () => {
+            fillCircle(0, 0, pupilR, "#222");
+            fillCircle(
+              -pupilR * 0.28,
+              -pupilR * 0.28,
+              pupilR * 0.22,
+              "rgba(255,255,255,0.85)",
+            );
+          });
+        }
+
+        // Two short nose lines, each centered on its own position
+        const halfDX = (r * 0.08) / 2;
+        const halfDY = (r * 0.14) / 2;
+        drawPart(ctx, x, y, p.noseLeftLeg, () => {
+          strokeLine(-halfDX, -halfDY, halfDX, halfDY, "#444", 1.4);
+        });
+        drawPart(ctx, x, y, p.noseRightLeg, () => {
+          strokeLine(halfDX, -halfDY, -halfDX, halfDY, "#444", 1.4);
+        });
+
+        ctx.restore();
+      }
+
+      // Eyebrows and mouth for the Object Condition's scrambled face.
+      // Always the flat "before" shapes now — they never move;
+      // only whether YELLOW is launched changes.
+      function drawCond7EyebrowsAndMouth(ctx, x, y, r, p) {
+        const browHalf = r * 0.22;
+        const browWidth = r * 0.085;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r - 0.5, 0, Math.PI * 2);
+        ctx.clip();
+
+        for (const brow of [p.browLeft, p.browRight]) {
+          drawPart(ctx, x, y, brow, () => {
+            ctx.beginPath();
+            ctx.moveTo(-browHalf, 0);
+            ctx.lineTo(browHalf, 0);
+            ctx.strokeStyle = "#2a1e0a";
+            ctx.lineWidth = browWidth;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          });
+        }
+        drawPart(ctx, x, y, p.mouth, () => {
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.28, 0);
+          ctx.lineTo(r * 0.28, 0);
+          ctx.strokeStyle = "#444";
+          ctx.lineWidth = 1.6;
+          ctx.lineCap = "round";
+          ctx.stroke();
+        });
+
+        ctx.restore();
+      }
+
+      /* ---------- Scrambled version D: a new random layout each trial ----------
+         Places the scrambled face's 9 parts (2 eyebrows, the mouth, 2
+         pupils, 2 eye whites, 2 nose lines) at a new random spot and
+         a new random angle every trial, so no two trials show the
+         same face. Rules: every part stays fully inside the ball, and
+         no two parts overlap. */
+      const D_PART_RADIUS = {
+        browLeft: 7.2,
+        browRight: 7.2,
+        mouth: 8.3,
+        scleraUpper: 7.6,
+        scleraLower: 7.6,
+        pupilUpper: 2.8,
+        pupilLower: 2.8,
+        noseLeftLeg: 2.8,
+        noseRightLeg: 2.8,
+      };
+      const D_EDGE_MARGIN = 1; // px kept free inside the ball's outline
+      const D_GAP = 1; // px kept free between any two parts
+      const D_REF_RADIUS = 26; // the reference ball radius these offsets are tuned for
+
+      // Tries random spots for one part until one fits inside the ball
+      // without touching the parts already placed. Returns null if
+      // none of 200 tries fits.
+      function findFreeSpot(name, placed) {
+        const partRadius = D_PART_RADIUS[name];
+        const maxDistance = D_REF_RADIUS - D_EDGE_MARGIN - partRadius;
+        for (let t = 0; t < 200; t++) {
+          const x = (Math.random() * 2 - 1) * maxDistance;
+          const y = (Math.random() * 2 - 1) * maxDistance;
+          if (Math.sqrt(x * x + y * y) > maxDistance) continue;
+
+          let overlaps = false;
+          for (const other in placed) {
+            const dx = x - placed[other].x;
+            const dy = y - placed[other].y;
+            const minDistance = partRadius + D_PART_RADIUS[other] + D_GAP;
+            if (Math.sqrt(dx * dx + dy * dy) < minDistance) overlaps = true;
+          }
+          if (!overlaps) return { x: x, y: y };
+        }
+        return null;
+      }
+
+      // Returns a random layout in the same shape as SCRAMBLED_VERSIONS:
+      // { before: { ...9 parts } }.
+      function makeRandomLayout() {
+        // Place the biggest parts first: they are the hardest to fit.
+        const names = Object.keys(D_PART_RADIUS).sort(
+          (a, b) => D_PART_RADIUS[b] - D_PART_RADIUS[a],
+        );
+        for (let attempt = 0; attempt < 1000; attempt++) {
+          const placed = {};
+          let allFit = true;
+          for (const name of names) {
+            const spot = findFreeSpot(name, placed);
+            if (spot === null) {
+              allFit = false;
+              break;
+            }
+            placed[name] = spot;
+          }
+          if (allFit) {
+            for (const name of names) {
+              placed[name].deg = Math.random() * 360;
+            }
+            return { before: placed };
+          }
+        }
+        // Practically never happens; fall back to a fixed version.
+        console.warn("Version D: no random layout found; using version A.");
+        return SCRAMBLED_VERSIONS.A;
+      }
+
+      /* ══════════════════════════════════════════════════════
+   GEOMETRY — YELLOW's starting spot and BLUE's starting spot sit
+   the same horizontal distance from the canvas midline, mirrored
+   across it, exactly as before. The only change: YELLOW's position
+   is no longer a fixed point — it's wherever the "patient" marker
+   has traveled to once launched — so causeStopX() (where BLUE stops)
+   is still measured from YELLOW's STARTING spot, which stays fixed
+   for the whole trial even after YELLOW takes off.
+══════════════════════════════════════════════════════ */
+      function makeLayout(canvasEl) {
+        function W() {
+          return canvasEl.width / DPR;
+        }
+        function patientStartX() {
+          return W() * 0.88;
+        }
+        function causeX0() {
+          return W() * 0.12;
+        }
+        function causeStopX() {
+          return patientStartX() - getAgentSize() - getPatientSize() - 2;
+        }
+        const Y = (canvasEl.height / DPR) * 0.5;
+        function framesUntilHit() {
+          return Math.ceil((causeStopX() - causeX0()) / getAgentSpeed());
+        }
+        return { W, patientStartX, causeX0, causeStopX, Y, framesUntilHit };
+      }
+
+      /* ══════════════════════════════════════════════════════
+   RUNNER — ROW 2 (Agent Condition)
+   State machine: "approaching" (BLUE moving in) → "hit" (BLUE has
+   stopped at contact) → "launched" (YELLOW is now moving right) →
+   "done" (YELLOW left the canvas; loop restarts after a short pause).
+══════════════════════════════════════════════════════ */
+      function makeRunnerNeutral(initCanvas, initStatus, initLoop, getDelay) {
+        let canvasEl = initCanvas,
+          statusEl = initStatus,
+          loopCheckbox = initLoop;
+        let ctx = canvasEl.getContext("2d");
+        function resize() {
+          const displayWidth = canvasEl.offsetWidth || 960;
+          const displayHeight = canvasEl.clientHeight || 320;
+          canvasEl.width = Math.round(displayWidth * DPR);
+          canvasEl.height = Math.round(displayHeight * DPR);
+          ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        }
+        resize();
+        const BG = "#fafafa";
+
+        let L = makeLayout(canvasEl);
+        let state = "idle",
+          causeX = 0,
+          patientX = 0;
+        let frame = 0,
+          effectFrame = 0,
+          animId = null;
+
+        function drawScene() {
+          ctx.clearRect(0, 0, L.W(), canvasEl.height / DPR);
+          ctx.fillStyle = BG;
+          ctx.fillRect(0, 0, L.W(), canvasEl.height / DPR);
+          drawBall(
+            ctx,
+            patientX,
+            L.Y,
+            getPatientSize(),
+            PATIENT_COLOR,
+            getPatientShape(),
+          );
+          drawFaceLines(ctx, patientX, L.Y, getPatientSize());
+          drawBall(
+            ctx,
+            causeX,
+            L.Y,
+            getAgentSize(),
+            AGENT_COLOR,
+            getAgentShape(),
+          );
+        }
+
+        function tick() {
+          frame++;
+          if (state === "approaching" || state === "hit") {
+            if (causeX < L.causeStopX()) {
+              causeX += getAgentSpeed();
+              if (causeX >= L.causeStopX()) {
+                causeX = L.causeStopX();
+                if (state === "approaching") state = "hit";
+              }
+            }
+            if (frame >= effectFrame) {
+              state = "launched";
+            }
+          }
+          if (state === "launched") {
+            patientX += getPatientLaunchSpeed();
+            if (patientX - getPatientSize() > L.W()) {
+              state = "done";
+              cancelAnimationFrame(animId);
+              drawScene();
+              if (loopCheckbox.checked)
+                setTimeout(() => run(), RESTART_PAUSE_MS);
+              return;
+            }
+          }
+          drawScene();
+          animId = requestAnimationFrame(tick);
+        }
+
+        function resetToFrameZero() {
+          resize();
+          L = makeLayout(canvasEl);
+          const d = getDelay(),
+            hitAt = L.framesUntilHit();
+          effectFrame = Math.max(1, hitAt + msToFrames(d));
+          state = "approaching";
+          causeX = L.causeX0();
+          patientX = L.patientStartX();
+          frame = 0;
+        }
+
+        function showFirstFrame() {
+          if (animId) cancelAnimationFrame(animId);
+          resetToFrameZero();
+          drawScene();
+        }
+
+        function run() {
+          if (animId) cancelAnimationFrame(animId);
+          resetToFrameZero();
+          drawScene();
+          animId = requestAnimationFrame(tick);
+        }
+
+        function setTarget(newCanvas, newStatus, newLoop) {
+          canvasEl = newCanvas;
+          statusEl = newStatus;
+          loopCheckbox = newLoop;
+          ctx = canvasEl.getContext("2d");
+          resize();
+          L = makeLayout(canvasEl);
+        }
+
+        return { run, showFirstFrame, setTarget };
+      }
+
+      /* ══════════════════════════════════════════════════════
+   RUNNER — ROW 1 (Object Condition)
+   Same launching state machine as Row 2; the rotated scrambled face
+   now travels along with YELLOW once launched.
+══════════════════════════════════════════════════════ */
+      function makeRunnerScrambled(initCanvas, initStatus, initLoop, getDelay) {
+        let canvasEl = initCanvas,
+          statusEl = initStatus,
+          loopCheckbox = initLoop;
+        let ctx = canvasEl.getContext("2d");
+        function resize() {
+          const displayWidth = canvasEl.offsetWidth || 960;
+          const displayHeight = canvasEl.clientHeight || 320;
+          canvasEl.width = Math.round(displayWidth * DPR);
+          canvasEl.height = Math.round(displayHeight * DPR);
+          ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        }
+        resize();
+        const BG = "#fafafa";
+
+        let L = makeLayout(canvasEl);
+        let state = "idle",
+          causeX = 0,
+          patientX = 0;
+        // The scrambled layout shown for this trial — a fixed version
+        // (A/B/C) or a freshly-randomized one (D). Chosen in
+        // resetToFrameZero(), so every replay of version D looks new.
+        let currentLayout = SCRAMBLED_VERSIONS.A;
+        let frame = 0,
+          effectFrame = 0,
+          animId = null;
+
+        function drawScene() {
+          ctx.clearRect(0, 0, L.W(), canvasEl.height / DPR);
+          ctx.fillStyle = BG;
+          ctx.fillRect(0, 0, L.W(), canvasEl.height / DPR);
+          ctx.save();
+          ctx.translate(patientX, L.Y);
+          ctx.rotate(Math.PI / 2);
+          ctx.translate(-patientX, -L.Y);
+          drawBall(
+            ctx,
+            patientX,
+            L.Y,
+            getPatientSize(),
+            PATIENT_COLOR,
+            getPatientShape(),
+          );
+          drawScrambledFace(
+            ctx,
+            patientX,
+            L.Y,
+            getPatientSize(),
+            currentLayout.before,
+          );
+          drawCond7EyebrowsAndMouth(
+            ctx,
+            patientX,
+            L.Y,
+            getPatientSize(),
+            currentLayout.before,
+          );
+          ctx.restore();
+          drawBall(
+            ctx,
+            causeX,
+            L.Y,
+            getAgentSize(),
+            AGENT_COLOR,
+            getAgentShape(),
+          );
+        }
+
+        function tick() {
+          frame++;
+          if (state === "approaching" || state === "hit") {
+            if (causeX < L.causeStopX()) {
+              causeX += getAgentSpeed();
+              if (causeX >= L.causeStopX()) {
+                causeX = L.causeStopX();
+                if (state === "approaching") state = "hit";
+              }
+            }
+            if (frame >= effectFrame) {
+              state = "launched";
+            }
+          }
+          if (state === "launched") {
+            patientX += getPatientLaunchSpeed();
+            if (patientX - getPatientSize() > L.W()) {
+              state = "done";
+              cancelAnimationFrame(animId);
+              drawScene();
+              if (loopCheckbox.checked)
+                setTimeout(() => run(), RESTART_PAUSE_MS);
+              return;
+            }
+          }
+          drawScene();
+          animId = requestAnimationFrame(tick);
+        }
+
+        function resetToFrameZero() {
+          resize();
+          L = makeLayout(canvasEl);
+          const d = getDelay(),
+            hitAt = L.framesUntilHit();
+          effectFrame = Math.max(1, hitAt + msToFrames(d));
+          state = "approaching";
+          causeX = L.causeX0();
+          patientX = L.patientStartX();
+          frame = 0;
+          currentLayout =
+            scrambledVersion === "D"
+              ? makeRandomLayout()
+              : SCRAMBLED_VERSIONS[scrambledVersion];
+        }
+
+        function showFirstFrame() {
+          if (animId) cancelAnimationFrame(animId);
+          resetToFrameZero();
+          drawScene();
+        }
+
+        function run() {
+          if (animId) cancelAnimationFrame(animId);
+          resetToFrameZero();
+          drawScene();
+          animId = requestAnimationFrame(tick);
+        }
+
+        function setTarget(newCanvas, newStatus, newLoop) {
+          canvasEl = newCanvas;
+          statusEl = newStatus;
+          loopCheckbox = newLoop;
+          ctx = canvasEl.getContext("2d");
+          resize();
+          L = makeLayout(canvasEl);
+        }
+
+        return { run, showFirstFrame, setTarget };
+      }
+
+      /* ══════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════ */
+      window.addEventListener("load", () => {
+        const loop1 = document.getElementById("loop1");
+        const loop2 = document.getElementById("loop2");
+
+        const r1 = makeRunnerNeutral(
+          document.getElementById("c1"),
+          document.getElementById("st1"),
+          loop1,
+          getDelay1,
+        );
+        const r2 = makeRunnerScrambled(
+          document.getElementById("c2"),
+          document.getElementById("st2"),
+          loop2,
+          getDelay2,
+        );
+
+        document.getElementById("replay1").onclick = () => r1.run();
+        document.getElementById("replay2").onclick = () => r2.run();
+
+        /* Live delay updates restart the running animation */
+        delaySlider1.addEventListener("change", () => r1.run());
+        delaySlider2.addEventListener("change", () => r2.run());
+
+        /* ── Scrambled-face version buttons (Object Condition) ── */
+        const versionButtons = ["A", "B", "C", "D"].map((v) =>
+          document.getElementById("versionBtn" + v),
+        );
+        versionButtons.forEach((btn) => {
+          btn.onclick = () => {
+            scrambledVersion = btn.dataset.version;
+            versionButtons.forEach((b) =>
+              b.classList.toggle("selected", b === btn),
+            );
+            r2.run();
+          };
+        });
+
+        /* ── Fullscreen expand/close ── */
+        const overlay = document.getElementById("fullscreenOverlay");
+        const fsCanvas = document.getElementById("fsCanvas");
+        const fsStatus = document.getElementById("fsStatus");
+        const alwaysOnLoop = { checked: true };
+
+        const panelMap = {
+          expand1: {
+            runner: r1,
+            canvas: document.getElementById("c1"),
+            status: document.getElementById("st1"),
+            loop: loop1,
+          },
+          expand2: {
+            runner: r2,
+            canvas: document.getElementById("c2"),
+            status: document.getElementById("st2"),
+            loop: loop2,
+          },
+        };
+
+        let activeFs = null;
+
+        Object.keys(panelMap).forEach((btnId) => {
+          document.getElementById(btnId).onclick = () => {
+            const { runner } = panelMap[btnId];
+            activeFs = panelMap[btnId];
+            overlay.classList.add("active");
+            runner.setTarget(fsCanvas, fsStatus, alwaysOnLoop);
+            runner.run();
+          };
+        });
+
+        document.getElementById("fsClose").onclick = () => {
+          if (!activeFs) return;
+          overlay.classList.remove("active");
+          const { runner, canvas, status, loop } = activeFs;
+          runner.setTarget(canvas, status, loop);
+          runner.showFirstFrame();
+          activeFs = null;
+        };
+
+        window.addEventListener("resize", () => {
+          if (activeFs) {
+            activeFs.runner.setTarget(fsCanvas, fsStatus, alwaysOnLoop);
+            activeFs.runner.run();
+          }
+        });
+
+        /* Show only the first frame of each animation initially —
+           rather than auto-playing on load. */
+        r1.showFirstFrame();
+        r2.showFirstFrame();
+      });
+    </script>
+  </body>
+</html>
