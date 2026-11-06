@@ -1,0 +1,1517 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Causal Delay — Barrier Demo (Vertical)</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Georgia", serif;
+        background: #f4f1ec;
+        color: #333;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 28px 16px 70px;
+      }
+
+      /* ── Layout: single column, one row per condition, stacked
+             vertically ── */
+      .top-wrap {
+        width: 100%;
+        max-width: 998px;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        align-items: stretch;
+      }
+      .row {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* ── Delay control bar ── */
+      .delayBar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        width: 100%;
+        background: #f4f1ec;
+        padding: 14px 18px;
+        border: 1px solid #ddd6c8;
+        border-radius: 8px;
+        margin-bottom: 18px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .ctrl-label {
+        font-size: 12px;
+        color: #777;
+        letter-spacing: 0.03em;
+        text-align: center;
+      }
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 220px;
+        height: 4px;
+        background: #ddd6c8;
+        border-radius: 2px;
+        outline: none;
+        cursor: pointer;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #b8935a;
+        cursor: pointer;
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #b8935a;
+        border: none;
+        cursor: pointer;
+      }
+      .delay-readout {
+        font-size: 16px;
+        font-weight: bold;
+        color: #b8935a;
+        min-width: 68px;
+        text-align: center;
+      }
+      .delay-note {
+        font-size: 10.5px;
+        color: #aaa;
+        text-align: center;
+        margin-top: 8px;
+        line-height: 1.5;
+      }
+      .delay-note em {
+        color: #b8935a;
+        font-style: normal;
+      }
+
+      /* ── Panel — sized to match each trial's canvas in
+             spc_pilot1_script_V3_shifted.html (max-width 998px =
+             960px canvas + 2×18px padding + 2×1px border, fixed
+             320px height) ── */
+      .panel {
+        width: 100%;
+        max-width: 998px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #e8e1d4;
+        border-radius: 10px;
+        padding: 18px;
+      }
+      .panel-label {
+        font-size: 12px;
+        color: #888;
+        text-align: center;
+        margin-bottom: 10px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        line-height: 1.6;
+      }
+      .cond-num {
+        display: inline-block;
+        font-size: 11px;
+        color: #b8935a;
+        margin-bottom: 2px;
+        font-weight: bold;
+      }
+      .sub {
+        color: #bbb;
+        font-size: 10px;
+        text-transform: none;
+        display: block;
+        margin-top: 2px;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 320px;
+        border: 2px solid #000;
+        border-radius: 6px;
+        background: #fafafa;
+      }
+
+      /* ── Fullscreen expand button ── */
+      .expand-btn {
+        position: absolute;
+        bottom: 14px;
+        right: 14px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #ddd6c8;
+        color: #b8935a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        cursor: pointer;
+        z-index: 5;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          transform 0.1s;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+      }
+      .expand-btn:hover {
+        background: #fbf6ec;
+        border-color: #b8935a;
+        transform: scale(1.06);
+      }
+
+      /* ── Fullscreen overlay ── */
+      #fullscreenOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: #fafafa;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+      }
+      #fullscreenOverlay.active {
+        display: flex;
+      }
+      #fsCanvas {
+        width: min(90vw, 1100px);
+        height: min(70vh, 620px);
+        border: 2px solid #000;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+      #fsClose {
+        position: absolute;
+        top: 24px;
+        right: 28px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #ddd6c8;
+        color: #b8935a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+      }
+      #fsClose:hover {
+        background: #fbf6ec;
+        border-color: #b8935a;
+      }
+      #fsStatus {
+        display: none;
+      }
+
+      /* ── Loop controls per panel ── */
+      .panel-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .loop-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #888;
+        cursor: pointer;
+        user-select: none;
+      }
+      .loop-toggle input {
+        width: 15px;
+        height: 15px;
+        accent-color: #b8935a;
+        cursor: pointer;
+      }
+      .status {
+        display: none;
+      }
+      .replay-btn {
+        background: transparent;
+        border: 1px solid #ddd6c8;
+        color: #999;
+        font-family: "Georgia", serif;
+        font-size: 11px;
+        padding: 5px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        letter-spacing: 0.03em;
+        transition:
+          border-color 0.15s,
+          color 0.15s;
+      }
+      .replay-btn:hover {
+        border-color: #b8935a;
+        color: #b8935a;
+      }
+
+      /* ── Scrambled-face version picker (Object Condition only) ── */
+      .version-select {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .version-label {
+        font-size: 11px;
+        color: #999;
+        letter-spacing: 0.03em;
+      }
+      .version-btn {
+        background: transparent;
+        border: 1px solid #ddd6c8;
+        color: #999;
+        font-family: "Georgia", serif;
+        font-size: 11px;
+        width: 26px;
+        height: 26px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          color 0.15s,
+          background 0.15s;
+      }
+      .version-btn:hover {
+        border-color: #b8935a;
+        color: #b8935a;
+      }
+      .version-btn.selected {
+        border-color: #b8935a;
+        background: #fbf6ec;
+        color: #8f6d3c;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top-wrap">
+      <!-- ══════════════ ROW 1 (display order) — Object Condition (scrambled face) ══════════════ -->
+      <div class="row">
+        <div class="delayBar">
+          <div class="controls">
+            <span class="ctrl-label"
+              >Delay from BLUE's blocked arrival<br />to YELLOW's
+              change:</span
+            >
+            <input
+              type="range"
+              id="delaySlider2"
+              min="0"
+              max="16"
+              step="1"
+              value="8"
+            />
+            <span class="delay-readout" id="delayVal2">0 ms</span>
+          </div>
+          <div class="delay-note">
+            <em></em>
+            <em></em>-1000, -750, -500, -250, -100, -50, -33, -17, 0, 17, 33,
+            50, 100, 250, 500, 750, 1000
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-label">
+            <span class="cond-num">Object Condition</span>
+          </div>
+          <canvas id="c2" width="960" height="320"></canvas>
+          <div class="expand-btn" id="expand2" title="Fullscreen">→</div>
+          <div class="panel-controls">
+            <label class="loop-toggle"
+              ><input type="checkbox" id="loop2" checked /> Loop</label
+            >
+            <button class="replay-btn" id="replay2">Replay</button>
+            <div class="version-select">
+              <span class="version-label">Face version:</span>
+              <button
+                class="version-btn selected"
+                id="versionBtnA"
+                data-version="A"
+              >
+                A
+              </button>
+              <button class="version-btn" id="versionBtnB" data-version="B">
+                B
+              </button>
+              <button class="version-btn" id="versionBtnC" data-version="C">
+                C
+              </button>
+              <button class="version-btn" id="versionBtnD" data-version="D">
+                D
+              </button>
+            </div>
+          </div>
+          <div class="status" id="st2"></div>
+        </div>
+      </div>
+
+      <!-- ══════════════ ROW 2 (display order) — Agent Condition (upright face, line change) ══════════════ -->
+      <div class="row">
+        <div class="delayBar">
+          <div class="controls">
+            <span class="ctrl-label"
+              >Delay from BLUE's blocked arrival<br />to YELLOW's
+              change:</span
+            >
+            <input
+              type="range"
+              id="delaySlider1"
+              min="0"
+              max="16"
+              step="1"
+              value="8"
+            />
+            <span class="delay-readout" id="delayVal1">0 ms</span>
+          </div>
+          <div class="delay-note">
+            <em></em> <em></em> -1000, -750, -500, -250, -100, -50, -33, -17, 0,
+            17, 33, 50, 100, 250, 500, 750, 1000
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-label">
+            <span class="cond-num">Agent Condition</span>
+          </div>
+          <canvas id="c1" width="960" height="320"></canvas>
+          <div class="expand-btn" id="expand1" title="Fullscreen">→</div>
+          <div class="panel-controls">
+            <label class="loop-toggle"
+              ><input type="checkbox" id="loop1" checked /> Loop</label
+            >
+            <button class="replay-btn" id="replay1">Replay</button>
+          </div>
+          <div class="status" id="st1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+     FULLSCREEN OVERLAY
+══════════════════════════════════════════════ -->
+    <div id="fullscreenOverlay">
+      <div id="fsClose" title="Close">✕</div>
+      <canvas id="fsCanvas"></canvas>
+      <div id="fsStatus"></div>
+    </div>
+
+    <script>
+      "use strict";
+
+      /* ══════════════════════════════════════════════════════
+         PARADIGM NOTE (exploratory demo)
+         A solid barrier now sits midway between BLUE and YELLOW.
+         BLUE approaches as before but is physically stopped by the
+         barrier partway there — it never reaches YELLOW, so there is
+         no real contact at all.
+
+         The delay slider, though, still counts from the moment BLUE
+         WOULD have reached YELLOW if the barrier weren't there (its
+         original, unobstructed travel time — about 3.6s at the
+         default speed/distance). So "0 ms" still means "right when
+         contact would have happened," even though no contact is ever
+         seen — only BLUE hitting the barrier, stopping, and then
+         YELLOW changing on its own some time later.
+══════════════════════════════════════════════════════ */
+
+      /* ══════════════════════════════════════════════════════
+   DEVICE PIXEL RATIO — fixes the blurry-ball issue.
+   Each canvas's backing store (canvas.width/height, the actual pixel
+   buffer it draws into) is now sized at DPR× its on-screen CSS size,
+   while the CSS size itself stays the same — so on a 2x/3x "retina"
+   display, the canvas has 2x/3x as many real pixels to draw with
+   instead of being a small buffer stretched up to fill a larger box
+   (which is what caused the blur). ctx.setTransform(DPR, ...) in each
+   runner's resize() then scales all drawing so every existing
+   coordinate (ball radius, positions, etc.) still means the same
+   thing in CSS pixels — nothing else about the layout changes.
+══════════════════════════════════════════════════════ */
+      const DPR = window.devicePixelRatio || 1;
+
+      /* ══════════════════════════════════════════════════════
+   FIXED STIMULUS PARAMETERS
+══════════════════════════════════════════════════════ */
+      const FPS = 60;
+      const MM_TO_PX = 2;
+      const BALL_DIAMETER_MM = 26;
+      const BALL_RADIUS_MM = BALL_DIAMETER_MM / 2;
+      const BALL_SPEED_MM_PER_S = 90;
+
+      const BALL_RADIUS_PX = BALL_RADIUS_MM * MM_TO_PX; // 26 px
+
+      const AGENT_COLOR = "#7a9ec9"; // blue — causal agent
+      const PATIENT_COLOR = "#e8b860"; // yellow — stays this color the whole trial
+      const BARRIER_COLOR = "#333"; // the solid wall between BLUE and YELLOW
+
+      /* How wide the barrier's front face is (this is what BLUE's
+         collision is measured against), how much empty space is left
+         between BLUE and that face once BLUE stops, and how far the
+         barrier's top/side faces recede to give it a 3D look. */
+      const BARRIER_WIDTH_PX = 16;
+      const BARRIER_GAP_PX = 2;
+      const BARRIER_DEPTH_PX = 8;
+
+      function getAgentSize() {
+        return BALL_RADIUS_PX;
+      }
+      function getPatientSize() {
+        return BALL_RADIUS_PX;
+      }
+      /* Real mm/s → px this frame, using the live measured ms-per-frame
+         (defined just below) rather than assuming 1000/60. On a 120Hz
+         screen, measuredFrameMs is roughly half of a 60Hz screen's, so
+         this returns roughly half the px — same real-world mm/s, twice
+         as many (smaller) steps to cover it. Falls back to the
+         assumed-60fps value only in the brief window before the first
+         real calibration sample arrives. */
+      function getAgentSpeed() {
+        return BALL_SPEED_MM_PER_S * MM_TO_PX * (measuredFrameMs / 1000);
+      }
+      function getAgentShape() {
+        return "circle";
+      }
+      function getPatientShape() {
+        return "circle";
+      }
+
+      /* ══════════════════════════════════════════════════════
+         RUNTIME FRAME-RATE CALIBRATION
+         requestAnimationFrame fires once per display refresh, not on
+         a fixed clock — so on a 120Hz/144Hz screen it fires roughly
+         twice as often as on a standard 60Hz screen. Anywhere the
+         code converts a real-time duration (the delay slider value)
+         into a frame count using the hardcoded assumption of 1000/60
+         ms per frame, that duration silently runs faster or slower in
+         real time depending on the viewer's actual hardware.
+
+         This loop runs continuously for the whole session and keeps a
+         running, exponentially-smoothed estimate of the REAL
+         ms-per-frame on this machine, by timestamping consecutive rAF
+         callbacks with performance.now(). Anywhere a duration needs
+         to become a frame count, we divide by measuredFrameMs instead
+         of the assumed 1000/FPS — so elapsed real time converges on
+         the intended duration regardless of hardware.
+      ══════════════════════════════════════════════════════ */
+      let measuredFrameMs = 1000 / FPS; // seeded at the assumed value until real samples arrive
+      let lastCalibTs = null;
+      const FRAME_EMA_ALPHA = 0.05; // smoothing: low = stable/slow-adapting, high = jumpy
+
+      function calibrationTick(ts) {
+        if (lastCalibTs !== null) {
+          const dt = ts - lastCalibTs;
+          if (dt > 0 && dt < 250) {
+            measuredFrameMs =
+              measuredFrameMs * (1 - FRAME_EMA_ALPHA) + dt * FRAME_EMA_ALPHA;
+          }
+        }
+        lastCalibTs = ts;
+        requestAnimationFrame(calibrationTick);
+      }
+      requestAnimationFrame(calibrationTick);
+
+      /* Real-time duration (ms) → frame count, using the live measured
+         frame interval rather than the hardcoded 1000/FPS assumption. */
+      function msToFrames(ms) {
+        return Math.round(ms / measuredFrameMs);
+      }
+
+      const POST_EFFECT_HOLD_MS = 1400; // how long the "changed" frame stays on screen before the trial ends
+
+      /* ══════════════════════════════════════════════════════
+   DELAY SLIDERS — still counted from BLUE's ORIGINAL (unobstructed)
+   travel time to YELLOW, not from when it actually stops at the
+   barrier (see the paradigm note above).
+══════════════════════════════════════════════════════ */
+      const DELAY_VALUES = [
+        -1000, -750, -500, -250, -100, -50, -33, -17, 0, 17, 33, 50, 100, 250,
+        500, 750, 1000,
+      ];
+      function fmtDelay(v) {
+        return v === 0 ? "0 ms" : (v > 0 ? "+" : "") + v + " ms";
+      }
+
+      function wireDelaySlider(sliderEl, readoutEl) {
+        readoutEl.textContent = fmtDelay(DELAY_VALUES[+sliderEl.value]);
+        sliderEl.oninput = () => {
+          readoutEl.textContent = fmtDelay(DELAY_VALUES[+sliderEl.value]);
+        };
+        return () => DELAY_VALUES[+sliderEl.value];
+      }
+
+      const delaySlider1 = document.getElementById("delaySlider1");
+      const getDelay1 = wireDelaySlider(
+        delaySlider1,
+        document.getElementById("delayVal1"),
+      );
+      const delaySlider2 = document.getElementById("delaySlider2");
+      const getDelay2 = wireDelaySlider(
+        delaySlider2,
+        document.getElementById("delayVal2"),
+      );
+
+      /* ══════════════════════════════════════════════════════
+   DRAWING PRIMITIVES
+══════════════════════════════════════════════════════ */
+      function drawBall(ctx, x, y, r, col, shape = "circle") {
+        ctx.fillStyle = col;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.5;
+        if (shape === "square") {
+          ctx.beginPath();
+          ctx.rect(x - r, y - r, r * 2, r * 2);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      // Fraction of the canvas's CSS height where the ground surface
+      // sits. BLUE, YELLOW and the barrier's base all rest exactly on
+      // this line.
+      const GROUND_Y_FRACTION = 0.78;
+      function groundY(canvasHeightCss) {
+        return canvasHeightCss * GROUND_Y_FRACTION;
+      }
+
+      // The ground plane: a flat floor filling everything below
+      // groundY, with a slightly darker line marking its top edge (the
+      // surface the balls and barrier stand on).
+      function drawGround(ctx, widthCss, canvasHeightCss) {
+        const gY = groundY(canvasHeightCss);
+        ctx.fillStyle = "#e6e1d4";
+        ctx.fillRect(0, gY, widthCss, canvasHeightCss - gY);
+        ctx.strokeStyle = "#c7c0ac";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, gY);
+        ctx.lineTo(widthCss, gY);
+        ctx.stroke();
+      }
+
+      // The solid barrier: a front slab plus a slightly wider, darker
+      // "back" slab peeking out from behind its right edge — both are
+      // plain upright rectangles (no diagonal/receding lines), so
+      // there is nothing that can look tilted or cut off. Both
+      // rectangles share the same top and bottom, and both sit flush
+      // on the ground line, so all four of their bottom corners (the
+      // back slab's two plus the front slab's two) rest on the floor.
+      function drawBarrier(ctx, barrierX, canvasHeightCss) {
+        const top = canvasHeightCss * 0.22;
+        const bottom = groundY(canvasHeightCss);
+        const left = barrierX - BARRIER_WIDTH_PX / 2;
+        const right = barrierX + BARRIER_WIDTH_PX / 2;
+        const d = BARRIER_DEPTH_PX;
+
+        // Back slab (darkest) — peeks out to the right of the front
+        // slab, giving the wall its visible thickness.
+        ctx.fillStyle = "#4a4a4a";
+        ctx.fillRect(left + d, top, BARRIER_WIDTH_PX, bottom - top);
+
+        // Front slab (mid gray, with a soft gradient for a rounded,
+        // less flat look) — drawn on top, in front of the back slab.
+        const grad = ctx.createLinearGradient(left, 0, right, 0);
+        grad.addColorStop(0, "#9a9a9a");
+        grad.addColorStop(0.5, "#848484");
+        grad.addColorStop(1, "#6e6e6e");
+        ctx.fillStyle = grad;
+        ctx.fillRect(left, top, BARRIER_WIDTH_PX, bottom - top);
+
+        // Thin highlight along the front slab's top edge, to suggest
+        // light catching the top of the wall without drawing an
+        // actual (and potentially misleading) sloped top face.
+        ctx.fillStyle = "#c2c2c2";
+        ctx.fillRect(left, top, BARRIER_WIDTH_PX, 3);
+      }
+
+      /* ── Row 2 (Agent Condition) face ──
+         Upright face, looking left (toward the agent ball).
+         Before the change: flat eyebrows, flat mouth line (neutral).
+         After the change: slanted eyebrows ("angry") and a frown arc
+         — this line change is the causal signal, triggered by timing
+         alone now, since BLUE never actually reaches YELLOW. */
+      function drawFaceLines(ctx, bx, by, r, isAngry) {
+        const eyeR = r * 0.22;
+        const eyeY = by - r * 0.22;
+        const eyeOffsetX = r * 0.34;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(bx, by, r - 0.5, 0, Math.PI * 2);
+        ctx.clip();
+
+        // Eyebrows (angry: outer ends high, inner ends low)
+        const browOuterY = eyeY - eyeR * 1.55;
+        const browInnerY = isAngry ? eyeY - eyeR * 0.9 : browOuterY;
+        const browWidth = r * 0.085;
+        const leftEyeX = bx - eyeOffsetX;
+        const rightEyeX = bx + eyeOffsetX;
+        ctx.strokeStyle = "#2a1e0a";
+        ctx.lineWidth = browWidth;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(leftEyeX - eyeR, browOuterY);
+        ctx.lineTo(leftEyeX + eyeR, browInnerY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(rightEyeX - eyeR, browInnerY);
+        ctx.lineTo(rightEyeX + eyeR, browOuterY);
+        ctx.stroke();
+
+        // Eyes: white, outline, pupil shifted left, small highlight
+        const pupilR = eyeR * 0.46;
+        const pupilShift = -eyeR * 0.34; // looking left, toward the agent
+        for (const eyeX of [leftEyeX, rightEyeX]) {
+          ctx.beginPath();
+          ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2);
+          ctx.fillStyle = "#fff";
+          ctx.fill();
+          ctx.strokeStyle = "#444";
+          ctx.lineWidth = 1.0;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(eyeX + pupilShift - 0.8, eyeY, pupilR, 0, Math.PI * 2);
+          ctx.fillStyle = "#1a0e00";
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(
+            eyeX + pupilShift - pupilR * 0.28,
+            eyeY - pupilR * 0.28,
+            pupilR * 0.22,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          ctx.fill();
+        }
+
+        // Nose (small "v")
+        const noseTopY = eyeY + r * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(bx - r * 0.08, noseTopY);
+        ctx.lineTo(bx, noseTopY + r * 0.14);
+        ctx.lineTo(bx + r * 0.08, noseTopY);
+        ctx.strokeStyle = "#2a1e0a";
+        ctx.lineWidth = 1.4;
+        ctx.lineCap = "round";
+        ctx.stroke();
+
+        // Mouth (neutral: straight line; angry: frown arc)
+        if (isAngry) {
+          ctx.beginPath();
+          ctx.arc(bx, by + r * 0.82, r * 0.3, Math.PI * 1.1, Math.PI * 1.9);
+          ctx.strokeStyle = "#2a1e0a";
+          ctx.lineWidth = 1.7;
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(bx - r * 0.28, by + r * 0.5);
+          ctx.lineTo(bx + r * 0.28, by + r * 0.5);
+          ctx.strokeStyle = "#444";
+          ctx.lineWidth = 1.6;
+          ctx.lineCap = "round";
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+
+      /* ── Row 1 (Object Condition) scrambled face ──
+         Four layouts the "Face version" buttons switch between: A, B
+         and C are fixed hand-placed layouts; D places all nine parts
+         at a new random spot every trial. Each layout lists where its
+         parts sit as x/y offsets (px, on the 26-px reference ball)
+         from the ball's center, BEFORE the 90° rotation applied in
+         the Object Condition's drawScene.
+         "before" = parts that never change, plus flat brows + a flat
+                    mouth line.
+         "after"  = where the slanted brows + frown arc go after the
+                    change (the same line change as the Agent
+                    Condition's face, just relocated/rotated here).
+         A part can also have "deg": turn it around its own point by
+         that many degrees clockwise (no "deg" means 0). */
+      const SCRAMBLED_VERSIONS = {
+        A: {
+          before: {
+            browLeft: { x: 13, y: 0 },
+            browRight: { x: -13, y: 0 },
+            mouth: { x: 0, y: 0 },
+            pupilUpper: { x: -22, y: 0 },
+            pupilLower: { x: 22, y: 0 },
+            scleraUpper: { x: 0, y: -18 },
+            scleraLower: { x: 0, y: 18 },
+            noseLeftLeg: { x: -9, y: 17 },
+            noseRightLeg: { x: 9, y: -17 },
+          },
+          after: {
+            browLeft: { x: 13, y: 0 },
+            browRight: { x: -13, y: 0 },
+            mouth: { x: 0, y: 0 },
+          },
+        },
+        B: {
+          before: {
+            browLeft: { x: 14, y: -10 },
+            browRight: { x: -13, y: 11 },
+            mouth: { x: 0, y: 0 },
+            pupilUpper: { x: 15, y: -12, deg: 180 },
+            pupilLower: { x: -13, y: 12, deg: 180 },
+            scleraUpper: { x: 12, y: 12 },
+            scleraLower: { x: -10, y: -12.5 },
+            noseLeftLeg: { x: 21, y: 10 },
+            noseRightLeg: { x: -19, y: -10 },
+          },
+          after: {
+            browLeft: { x: 14, y: -10 },
+            browRight: { x: -13, y: 11 },
+            mouth: { x: 0, y: 2.5 },
+          },
+        },
+        C: {
+          before: {
+            browLeft: { x: 10, y: 12 },
+            browRight: { x: -10, y: -12 },
+            mouth: { x: 0, y: 0 },
+            pupilUpper: { x: 18, y: 12 },
+            pupilLower: { x: -17, y: -12 },
+            scleraUpper: { x: 12, y: -12, deg: 270 },
+            scleraLower: { x: -10, y: 12, deg: 270 },
+            noseLeftLeg: { x: 21, y: -10 },
+            noseRightLeg: { x: -19, y: 10 },
+          },
+          after: {
+            browLeft: { x: 10, y: 12 },
+            browRight: { x: -10, y: -12 },
+            mouth: { x: 0, y: 2.5 },
+          },
+        },
+      };
+
+      // Which scrambled layout the Object Condition panel shows right
+      // now. Changed with the A/B/C/D buttons under the canvas.
+      let scrambledVersion = "A";
+
+      // Draws one face part: moves to its x/y point (measured from the
+      // ball's center x, y), turns by its "deg", then calls
+      // drawFunction, which draws the part around (0, 0).
+      function drawPart(ctx, x, y, part, drawFunction) {
+        ctx.save();
+        ctx.translate(x + part.x, y + part.y);
+        ctx.rotate(((part.deg || 0) * Math.PI) / 180);
+        drawFunction();
+        ctx.restore();
+      }
+
+      // Scrambled face parts that never change: two "eyes" (white
+      // circle with a yellow dot), two dark pupils and two short nose
+      // lines. p = the "before" positions of the chosen layout.
+      function drawScrambledFace(ctx, x, y, r, p) {
+        const eyeR = r * 0.22;
+        const pupilR = eyeR * 0.48;
+        const innerShift = eyeR - pupilR; // yellow dot inside the white eye
+        const dotShift = r * 0.55 + 3 - r * 0.48; // yellow dot beside it
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r - 0.5, 0, Math.PI * 2);
+        ctx.clip();
+
+        function fillCircle(cx, cy, rad, color) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+        function strokeCircle(cx, cy, rad, color, lw) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lw;
+          ctx.stroke();
+        }
+        function strokeLine(x1, y1, x2, y2, color, lw) {
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lw;
+          ctx.lineCap = "round";
+          ctx.stroke();
+        }
+
+        // Lower eye (its yellow dots sit toward +x)
+        drawPart(ctx, x, y, p.scleraLower, () => {
+          fillCircle(0, 0, eyeR, "#fff");
+          fillCircle(innerShift, 0, pupilR, PATIENT_COLOR);
+          strokeCircle(0, 0, eyeR, "#444", 1.0);
+          strokeCircle(innerShift, 0, pupilR, "#444", 1.0);
+          fillCircle(dotShift, 0, pupilR, PATIENT_COLOR);
+          fillCircle(
+            dotShift - pupilR * 0.28 - 3,
+            -pupilR * 0.28,
+            pupilR * 0.22,
+            PATIENT_COLOR,
+          );
+        });
+
+        // Upper eye (its yellow dots sit toward -x)
+        drawPart(ctx, x, y, p.scleraUpper, () => {
+          fillCircle(0, 0, eyeR, "#fff");
+          fillCircle(-innerShift, 0, pupilR, PATIENT_COLOR);
+          strokeCircle(0, 0, eyeR, "#444", 1.0);
+          strokeCircle(-innerShift, 0, pupilR, "#444", 1.0);
+          fillCircle(-dotShift, 0, pupilR, PATIENT_COLOR);
+          fillCircle(
+            -dotShift - pupilR * 0.28 + 3,
+            -pupilR * 0.28,
+            pupilR * 0.22,
+            PATIENT_COLOR,
+          );
+        });
+
+        // Two dark pupils with highlights
+        for (const pupil of [p.pupilLower, p.pupilUpper]) {
+          drawPart(ctx, x, y, pupil, () => {
+            fillCircle(0, 0, pupilR, "#222");
+            fillCircle(
+              -pupilR * 0.28,
+              -pupilR * 0.28,
+              pupilR * 0.22,
+              "rgba(255,255,255,0.85)",
+            );
+          });
+        }
+
+        // Two short nose lines, each centered on its own position
+        const halfDX = (r * 0.08) / 2;
+        const halfDY = (r * 0.14) / 2;
+        drawPart(ctx, x, y, p.noseLeftLeg, () => {
+          strokeLine(-halfDX, -halfDY, halfDX, halfDY, "#444", 1.4);
+        });
+        drawPart(ctx, x, y, p.noseRightLeg, () => {
+          strokeLine(halfDX, -halfDY, -halfDX, halfDY, "#444", 1.4);
+        });
+
+        ctx.restore();
+      }
+
+      // Scrambled face parts that DO change: eyebrows and mouth.
+      // Before: flat eyebrows, flat mouth line.
+      // After: slanted eyebrows + a frown arc (same shapes as the
+      // Agent Condition's angry face). v = the chosen layout
+      // (before + after). changed = whether we're past the effect.
+      function drawCond7EyebrowsAndMouth(ctx, x, y, r, v, changed) {
+        const browHalf = r * 0.22;
+        const browWidth = r * 0.085;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r - 0.5, 0, Math.PI * 2);
+        ctx.clip();
+
+        if (!changed) {
+          for (const brow of [v.before.browLeft, v.before.browRight]) {
+            drawPart(ctx, x, y, brow, () => {
+              ctx.beginPath();
+              ctx.moveTo(-browHalf, 0);
+              ctx.lineTo(browHalf, 0);
+              ctx.strokeStyle = "#2a1e0a";
+              ctx.lineWidth = browWidth;
+              ctx.lineCap = "round";
+              ctx.stroke();
+            });
+          }
+          drawPart(ctx, x, y, v.before.mouth, () => {
+            ctx.beginPath();
+            ctx.moveTo(-r * 0.28, 0);
+            ctx.lineTo(r * 0.28, 0);
+            ctx.strokeStyle = "#444";
+            ctx.lineWidth = 1.6;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          });
+        } else {
+          const slant = r * 0.22 * 0.325;
+          drawPart(ctx, x, y, v.after.browLeft, () => {
+            ctx.beginPath();
+            ctx.moveTo(-browHalf, -slant);
+            ctx.lineTo(browHalf, slant);
+            ctx.strokeStyle = "#2a1e0a";
+            ctx.lineWidth = browWidth;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          });
+          drawPart(ctx, x, y, v.after.browRight, () => {
+            ctx.beginPath();
+            ctx.moveTo(-browHalf, slant);
+            ctx.lineTo(browHalf, -slant);
+            ctx.strokeStyle = "#2a1e0a";
+            ctx.lineWidth = browWidth;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          });
+          // Frown arc; its x / y point is the center of the arc's circle.
+          drawPart(ctx, x, y, v.after.mouth, () => {
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.3, Math.PI * 1.1, Math.PI * 1.9);
+            ctx.strokeStyle = "#444";
+            ctx.lineWidth = 1.7;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          });
+        }
+
+        ctx.restore();
+      }
+
+      /* ---------- Scrambled version D: a new random layout each trial ----------
+         Places the scrambled face's 9 parts (2 eyebrows, the mouth, 2
+         pupils, 2 eye whites, 2 nose lines) at a new random spot and
+         a new random angle every trial, so no two trials show the
+         same face. Rules: every part stays fully inside the ball, and
+         no two parts overlap. At the change, the eyebrows slant and
+         the mouth becomes a frown arc at their own (randomized) spot
+         and angle, same as versions A, B and C. */
+      const D_PART_RADIUS = {
+        browLeft: 7.2,
+        browRight: 7.2,
+        mouth: 8.3, // holds both the line and the frown arc
+        scleraUpper: 7.6, // eye white plus its yellow dot
+        scleraLower: 7.6,
+        pupilUpper: 2.8,
+        pupilLower: 2.8,
+        noseLeftLeg: 2.8,
+        noseRightLeg: 2.8,
+      };
+      const D_EDGE_MARGIN = 1; // px kept free inside the ball's outline
+      const D_GAP = 1; // px kept free between any two parts
+      const D_MOUTH_ARC_SHIFT = 2.5; // frown arc sits this much lower than the line
+      const D_REF_RADIUS = 26; // the reference ball radius these offsets are tuned for
+
+      // Tries random spots for one part until one fits inside the ball
+      // without touching the parts already placed. Returns null if
+      // none of 200 tries fits.
+      function findFreeSpot(name, placed) {
+        const partRadius = D_PART_RADIUS[name];
+        const maxDistance = D_REF_RADIUS - D_EDGE_MARGIN - partRadius;
+        for (let t = 0; t < 200; t++) {
+          const x = (Math.random() * 2 - 1) * maxDistance;
+          const y = (Math.random() * 2 - 1) * maxDistance;
+          if (Math.sqrt(x * x + y * y) > maxDistance) continue;
+
+          let overlaps = false;
+          for (const other in placed) {
+            const dx = x - placed[other].x;
+            const dy = y - placed[other].y;
+            const minDistance = partRadius + D_PART_RADIUS[other] + D_GAP;
+            if (Math.sqrt(dx * dx + dy * dy) < minDistance) overlaps = true;
+          }
+          if (!overlaps) return { x: x, y: y };
+        }
+        return null;
+      }
+
+      // Returns a random layout in the same shape as SCRAMBLED_VERSIONS:
+      // { before: { ...9 parts }, after: { browLeft, browRight, mouth } }.
+      function makeRandomLayout() {
+        // Place the biggest parts first: they are the hardest to fit.
+        const names = Object.keys(D_PART_RADIUS).sort(
+          (a, b) => D_PART_RADIUS[b] - D_PART_RADIUS[a],
+        );
+        for (let attempt = 0; attempt < 1000; attempt++) {
+          const placed = {};
+          let allFit = true;
+          for (const name of names) {
+            const spot = findFreeSpot(name, placed);
+            if (spot === null) {
+              allFit = false;
+              break;
+            }
+            placed[name] = spot;
+          }
+          if (allFit) {
+            for (const name of names) {
+              placed[name].deg = Math.random() * 360;
+            }
+            // The frown arc sits D_MOUTH_ARC_SHIFT px "below" the mouth
+            // line in the mouth's own (turned) direction, and has the
+            // same rotation as the line.
+            const m = placed.mouth;
+            const angle = (m.deg * Math.PI) / 180;
+            const arcMouth = {
+              x: m.x - D_MOUTH_ARC_SHIFT * Math.sin(angle),
+              y: m.y + D_MOUTH_ARC_SHIFT * Math.cos(angle),
+              deg: m.deg,
+            };
+            return {
+              before: placed,
+              after: {
+                browLeft: placed.browLeft,
+                browRight: placed.browRight,
+                mouth: arcMouth,
+              },
+            };
+          }
+        }
+        // Practically never happens; fall back to a fixed version.
+        console.warn("Version D: no random layout found; using version A.");
+        return SCRAMBLED_VERSIONS.A;
+      }
+
+      /* ══════════════════════════════════════════════════════
+   GEOMETRY — the patient (yellow) and mover (blue) sit the same
+   horizontal distance from the canvas midline, mirrored across it,
+   exactly as in the non-barrier demos. The barrier sits at the exact
+   midline (0.5 of the canvas width); barrierStopX() is where BLUE's
+   own edge comes to rest against the barrier's near face, leaving a
+   small visible gap. causeStopX() (BLUE's ORIGINAL stopping point,
+   right at YELLOW) is kept only to compute the ORIGINAL travel time
+   used for the delay timing — see the paradigm note above — it is
+   never used to move BLUE in this demo.
+══════════════════════════════════════════════════════ */
+      function makeLayout(canvasEl) {
+        function W() {
+          return canvasEl.width / DPR;
+        }
+        function agentX0() {
+          return W() * 0.88;
+        }
+        function causeX0() {
+          return W() * 0.12;
+        }
+        function causeStopX() {
+          return agentX0() - getAgentSize() - getPatientSize() - 2;
+        }
+        function barrierX() {
+          return W() * 0.5;
+        }
+        function barrierStopX() {
+          return (
+            barrierX() - BARRIER_WIDTH_PX / 2 - BARRIER_GAP_PX - getAgentSize()
+          );
+        }
+        // Ball center sits just above the ground line, so the balls'
+        // bottoms touch the ground exactly like the barrier's base.
+        const Y = groundY(canvasEl.height / DPR) - getAgentSize();
+        // Frames until BLUE WOULD have reached YELLOW, had there been
+        // no barrier — this is what the delay slider counts from.
+        function framesUntilHit() {
+          return Math.ceil((causeStopX() - causeX0()) / getAgentSpeed());
+        }
+        return {
+          W,
+          agentX0,
+          causeX0,
+          causeStopX,
+          barrierX,
+          barrierStopX,
+          Y,
+          framesUntilHit,
+        };
+      }
+
+      /* ══════════════════════════════════════════════════════
+   RUNNER — ROW 2 (Agent Condition)
+   Exposes showFirstFrame() (draws frame 0, no animation) in
+   addition to run() (full play). BLUE now stops at the barrier
+   (barrierStopX), well short of YELLOW, but the timing of YELLOW's
+   change still runs off the ORIGINAL (no-barrier) travel time.
+══════════════════════════════════════════════════════ */
+      function makeRunnerNeutral(initCanvas, initStatus, initLoop, getDelay) {
+        let canvasEl = initCanvas,
+          statusEl = initStatus,
+          loopCheckbox = initLoop;
+        let ctx = canvasEl.getContext("2d");
+        function resize() {
+          const displayWidth = canvasEl.offsetWidth || 960;
+          const displayHeight = canvasEl.clientHeight || 320;
+          canvasEl.width = Math.round(displayWidth * DPR);
+          canvasEl.height = Math.round(displayHeight * DPR);
+          ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        }
+        resize();
+        const BG = "#fafafa";
+
+        let L = makeLayout(canvasEl);
+        let state = "idle",
+          causeX = 0,
+          changed = false;
+        let frame = 0,
+          effectFrame = 0,
+          animId = null;
+
+        function drawScene() {
+          ctx.clearRect(0, 0, L.W(), canvasEl.height / DPR);
+          ctx.fillStyle = BG;
+          ctx.fillRect(0, 0, L.W(), canvasEl.height / DPR);
+          drawGround(ctx, L.W(), canvasEl.height / DPR);
+          drawBarrier(ctx, L.barrierX(), canvasEl.height / DPR);
+          const ax = L.agentX0();
+          drawBall(
+            ctx,
+            ax,
+            L.Y,
+            getPatientSize(),
+            PATIENT_COLOR,
+            getPatientShape(),
+          );
+          drawFaceLines(ctx, ax, L.Y, getPatientSize(), changed);
+          drawBall(
+            ctx,
+            causeX,
+            L.Y,
+            getAgentSize(),
+            AGENT_COLOR,
+            getAgentShape(),
+          );
+        }
+
+        function tick() {
+          frame++;
+          // BLUE moves until it reaches the barrier, then stays put —
+          // it never travels on toward YELLOW.
+          if (causeX < L.barrierStopX()) {
+            causeX += getAgentSpeed();
+            if (causeX >= L.barrierStopX()) {
+              causeX = L.barrierStopX();
+              if (state === "approaching") state = "blocked";
+            }
+          }
+          // The change still fires off the ORIGINAL (no-barrier)
+          // timing, regardless of where BLUE actually is.
+          if (
+            (state === "approaching" || state === "blocked") &&
+            frame >= effectFrame
+          ) {
+            changed = true;
+            state = "expressed";
+          }
+          if (
+            state === "expressed" &&
+            frame > effectFrame + msToFrames(POST_EFFECT_HOLD_MS)
+          ) {
+            state = "done";
+            cancelAnimationFrame(animId);
+            drawScene();
+            if (loopCheckbox.checked) setTimeout(() => run(), 500);
+            return;
+          }
+          drawScene();
+          animId = requestAnimationFrame(tick);
+        }
+
+        function resetToFrameZero() {
+          resize();
+          L = makeLayout(canvasEl);
+          const d = getDelay(),
+            hitAt = L.framesUntilHit();
+          effectFrame = Math.max(1, hitAt + msToFrames(d));
+          state = "approaching";
+          causeX = L.causeX0();
+          changed = false;
+          frame = 0;
+        }
+
+        function showFirstFrame() {
+          if (animId) cancelAnimationFrame(animId);
+          resetToFrameZero();
+          drawScene();
+        }
+
+        function run() {
+          if (animId) cancelAnimationFrame(animId);
+          resetToFrameZero();
+          drawScene();
+          animId = requestAnimationFrame(tick);
+        }
+
+        function setTarget(newCanvas, newStatus, newLoop) {
+          canvasEl = newCanvas;
+          statusEl = newStatus;
+          loopCheckbox = newLoop;
+          ctx = canvasEl.getContext("2d");
+          resize();
+          L = makeLayout(canvasEl);
+        }
+
+        return { run, showFirstFrame, setTarget };
+      }
+
+      /* ══════════════════════════════════════════════════════
+   RUNNER — ROW 1 (Object Condition)
+   Same barrier-blocked-BLUE behavior as Row 2.
+══════════════════════════════════════════════════════ */
+      function makeRunnerScrambled(initCanvas, initStatus, initLoop, getDelay) {
+        let canvasEl = initCanvas,
+          statusEl = initStatus,
+          loopCheckbox = initLoop;
+        let ctx = canvasEl.getContext("2d");
+        function resize() {
+          const displayWidth = canvasEl.offsetWidth || 960;
+          const displayHeight = canvasEl.clientHeight || 320;
+          canvasEl.width = Math.round(displayWidth * DPR);
+          canvasEl.height = Math.round(displayHeight * DPR);
+          ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        }
+        resize();
+        const BG = "#fafafa";
+
+        let L = makeLayout(canvasEl);
+        let state = "idle",
+          causeX = 0,
+          changed = false;
+        // The scrambled layout shown for this trial — a fixed version
+        // (A/B/C) or a freshly-randomized one (D). Chosen in
+        // resetToFrameZero(), so every replay of version D looks new.
+        let currentLayout = SCRAMBLED_VERSIONS.A;
+        let frame = 0,
+          effectFrame = 0,
+          animId = null;
+
+        function drawScene() {
+          ctx.clearRect(0, 0, L.W(), canvasEl.height / DPR);
+          ctx.fillStyle = BG;
+          ctx.fillRect(0, 0, L.W(), canvasEl.height / DPR);
+          drawGround(ctx, L.W(), canvasEl.height / DPR);
+          drawBarrier(ctx, L.barrierX(), canvasEl.height / DPR);
+          const px = L.agentX0();
+          ctx.save();
+          ctx.translate(px, L.Y);
+          ctx.rotate(Math.PI / 2);
+          ctx.translate(-px, -L.Y);
+          drawBall(
+            ctx,
+            px,
+            L.Y,
+            getPatientSize(),
+            PATIENT_COLOR,
+            getPatientShape(),
+          );
+          drawScrambledFace(ctx, px, L.Y, getPatientSize(), currentLayout.before);
+          drawCond7EyebrowsAndMouth(
+            ctx,
+            px,
+            L.Y,
+            getPatientSize(),
+            currentLayout,
+            changed,
+          );
+          ctx.restore();
+          drawBall(
+            ctx,
+            causeX,
+            L.Y,
+            getAgentSize(),
+            AGENT_COLOR,
+            getAgentShape(),
+          );
+        }
+
+        function tick() {
+          frame++;
+          // BLUE moves until it reaches the barrier, then stays put —
+          // it never travels on toward YELLOW.
+          if (causeX < L.barrierStopX()) {
+            causeX += getAgentSpeed();
+            if (causeX >= L.barrierStopX()) {
+              causeX = L.barrierStopX();
+              if (state === "approaching") state = "blocked";
+            }
+          }
+          // The change still fires off the ORIGINAL (no-barrier)
+          // timing, regardless of where BLUE actually is.
+          if (
+            (state === "approaching" || state === "blocked") &&
+            frame >= effectFrame
+          ) {
+            changed = true;
+            state = "changed";
+          }
+          if (
+            state === "changed" &&
+            frame > effectFrame + msToFrames(POST_EFFECT_HOLD_MS)
+          ) {
+            state = "done";
+            cancelAnimationFrame(animId);
+            drawScene();
+            if (loopCheckbox.checked) setTimeout(() => run(), 500);
+            return;
+          }
+          drawScene();
+          animId = requestAnimationFrame(tick);
+        }
+
+        function resetToFrameZero() {
+          resize();
+          L = makeLayout(canvasEl);
+          const d = getDelay(),
+            hitAt = L.framesUntilHit();
+          effectFrame = Math.max(1, hitAt + msToFrames(d));
+          state = "approaching";
+          causeX = L.causeX0();
+          changed = false;
+          frame = 0;
+          currentLayout =
+            scrambledVersion === "D"
+              ? makeRandomLayout()
+              : SCRAMBLED_VERSIONS[scrambledVersion];
+        }
+
+        function showFirstFrame() {
+          if (animId) cancelAnimationFrame(animId);
+          resetToFrameZero();
+          drawScene();
+        }
+
+        function run() {
+          if (animId) cancelAnimationFrame(animId);
+          resetToFrameZero();
+          drawScene();
+          animId = requestAnimationFrame(tick);
+        }
+
+        function setTarget(newCanvas, newStatus, newLoop) {
+          canvasEl = newCanvas;
+          statusEl = newStatus;
+          loopCheckbox = newLoop;
+          ctx = canvasEl.getContext("2d");
+          resize();
+          L = makeLayout(canvasEl);
+        }
+
+        return { run, showFirstFrame, setTarget };
+      }
+
+      /* ══════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════ */
+      window.addEventListener("load", () => {
+        const loop1 = document.getElementById("loop1");
+        const loop2 = document.getElementById("loop2");
+
+        const r1 = makeRunnerNeutral(
+          document.getElementById("c1"),
+          document.getElementById("st1"),
+          loop1,
+          getDelay1,
+        );
+        const r2 = makeRunnerScrambled(
+          document.getElementById("c2"),
+          document.getElementById("st2"),
+          loop2,
+          getDelay2,
+        );
+
+        document.getElementById("replay1").onclick = () => r1.run();
+        document.getElementById("replay2").onclick = () => r2.run();
+
+        /* Live delay updates restart the running animation */
+        delaySlider1.addEventListener("change", () => r1.run());
+        delaySlider2.addEventListener("change", () => r2.run());
+
+        /* ── Scrambled-face version buttons (Object Condition) ── */
+        const versionButtons = ["A", "B", "C", "D"].map((v) =>
+          document.getElementById("versionBtn" + v),
+        );
+        versionButtons.forEach((btn) => {
+          btn.onclick = () => {
+            scrambledVersion = btn.dataset.version;
+            versionButtons.forEach((b) =>
+              b.classList.toggle("selected", b === btn),
+            );
+            r2.run();
+          };
+        });
+
+        /* ── Fullscreen expand/close ── */
+        const overlay = document.getElementById("fullscreenOverlay");
+        const fsCanvas = document.getElementById("fsCanvas");
+        const fsStatus = document.getElementById("fsStatus");
+        const alwaysOnLoop = { checked: true };
+
+        const panelMap = {
+          expand1: {
+            runner: r1,
+            canvas: document.getElementById("c1"),
+            status: document.getElementById("st1"),
+            loop: loop1,
+          },
+          expand2: {
+            runner: r2,
+            canvas: document.getElementById("c2"),
+            status: document.getElementById("st2"),
+            loop: loop2,
+          },
+        };
+
+        let activeFs = null;
+
+        Object.keys(panelMap).forEach((btnId) => {
+          document.getElementById(btnId).onclick = () => {
+            const { runner } = panelMap[btnId];
+            activeFs = panelMap[btnId];
+            overlay.classList.add("active");
+            runner.setTarget(fsCanvas, fsStatus, alwaysOnLoop);
+            runner.run();
+          };
+        });
+
+        document.getElementById("fsClose").onclick = () => {
+          if (!activeFs) return;
+          overlay.classList.remove("active");
+          const { runner, canvas, status, loop } = activeFs;
+          runner.setTarget(canvas, status, loop);
+          runner.showFirstFrame();
+          activeFs = null;
+        };
+
+        window.addEventListener("resize", () => {
+          if (activeFs) {
+            activeFs.runner.setTarget(fsCanvas, fsStatus, alwaysOnLoop);
+            activeFs.runner.run();
+          }
+        });
+
+        /* Show only the first frame of each animation initially —
+           rather than auto-playing on load. */
+        r1.showFirstFrame();
+        r2.showFirstFrame();
+      });
+    </script>
+  </body>
+</html>
